@@ -1,0 +1,89 @@
+package com.campushub.backend.teacher;
+
+import jakarta.persistence.*;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+
+@Entity
+@Table(
+        name = "teachers",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_teachers_teacher_id", columnNames = "teacher_id"),
+                @UniqueConstraint(name = "uk_teachers_email", columnNames = "email")
+        }
+)
+public class Teacher {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+
+    @Column(name = "teacher_id", nullable = false, unique = true, length = 20)
+    private String teacherId;
+
+    @Column(name = "full_name", nullable = false, length = 120)
+    private String fullName;
+
+    @Column(nullable = false, unique = true, length = 160)
+    private String email;
+
+    @Column(length = 30)
+    private String phone;
+
+    @Column(nullable = false, length = 80)
+    private String department;
+
+    @Column(nullable = false, length = 120)
+    private String specialization;
+
+    @Column(name = "hire_date", nullable = false)
+    private LocalDate hireDate;
+
+    @Column(nullable = false, length = 10)
+    private String status;
+
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+    @PrePersist
+    public void onCreate() {
+        LocalDateTime now = LocalDateTime.now();
+        createdAt = now;
+        updatedAt = now;
+
+        if (status == null || status.isBlank()) {
+            status = "ACTIVE";
+        }
+    }
+
+    @PreUpdate
+    public void onUpdate() {
+        updatedAt = LocalDateTime.now();
+    }
+
+    public Long getId() { return id; }
+    public String getTeacherId() { return teacherId; }
+    public String getFullName() { return fullName; }
+    public String getEmail() { return email; }
+    public String getPhone() { return phone; }
+    public String getDepartment() { return department; }
+    public String getSpecialization() { return specialization; }
+    public LocalDate getHireDate() { return hireDate; }
+    public String getStatus() { return status; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
+
+    public void setTeacherId(String teacherId) { this.teacherId = teacherId; }
+    public void setFullName(String fullName) { this.fullName = fullName; }
+    public void setEmail(String email) { this.email = email; }
+    public void setPhone(String phone) { this.phone = phone; }
+    public void setDepartment(String department) { this.department = department; }
+    public void setSpecialization(String specialization) {
+        this.specialization = specialization;
+    }
+    public void setHireDate(LocalDate hireDate) { this.hireDate = hireDate; }
+    public void setStatus(String status) { this.status = status; }
+}
