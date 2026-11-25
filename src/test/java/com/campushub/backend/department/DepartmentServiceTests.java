@@ -134,6 +134,28 @@ class DepartmentServiceTests {
     }
 
     @Test
+    void allowsDepartmentDeletionWhenOnlySoftDeletedStudentsReferenceIt() {
+        DepartmentResponse department = service.create(
+                new DepartmentRequest("Soft Delete Dept", "SDD", null, null)
+        );
+
+        Student student = new Student();
+        student.setStudentId("STU-5101");
+        student.setFullName("Soft Deleted Student");
+        student.setEmail("softdelete5001@example.com");
+        student.setDepartment("Soft Delete Dept");
+        student.setProgram("BSc Test");
+        student.setEnrollmentDate(LocalDate.now());
+        student.setStatus("ACTIVE");
+        student.markDeleted();
+        studentRepository.saveAndFlush(student);
+
+        service.delete(department.id());
+        assertTrue(repository.findById(department.id()).isEmpty());
+        assertTrue(studentRepository.findById(student.getId()).isPresent());
+    }
+
+    @Test
     void validatesRequiredDepartmentFields() {
         var violations = validator.validate(
                 new DepartmentRequest(" ", " ", null, null)

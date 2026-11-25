@@ -123,6 +123,63 @@ class AttendanceServiceTests {
     }
 
     @Test
+    void rejectsNewAttendanceForInactiveOrSoftDeletedStudentsButKeepsHistory() {
+        Student inactive = createStudent(
+                "STU-6004", "Inactive Test", "inactive6004@example.com"
+        );
+        inactive.setStatus("INACTIVE");
+        studentRepository.saveAndFlush(inactive);
+
+        ResponseStatusException inactiveConflict = assertThrows(
+                ResponseStatusException.class,
+                () -> service.create(new AttendanceRequest(
+                        inactive.getId(),
+                        LocalDate.of(2026, 11, 12),
+                        "PRESENT",
+                        null
+                ))
+        );
+        assertEquals(HttpStatus.CONFLICT, inactiveConflict.getStatusCode());
+
+        Student historyStudent = createStudent(
+                "STU-6005", "History Test", "history6005@example.com"
+        );
+        LocalDate historyDate = LocalDate.of(2026, 11, 13);
+        AttendanceResponse historical = service.create(
+                new AttendanceRequest(
+                        historyStudent.getId(), historyDate, "PRESENT", null
+                )
+        );
+
+        historyStudent.markDeleted();
+        studentRepository.saveAndFlush(historyStudent);
+
+        ResponseStatusException deletedConflict = assertThrows(
+                ResponseStatusException.class,
+                () -> service.create(new AttendanceRequest(
+                        historyStudent.getId(),
+                        historyDate.plusDays(1),
+                        "ABSENT",
+                        null
+                ))
+        );
+        assertEquals(HttpStatus.CONFLICT, deletedConflict.getStatusCode());
+
+        AttendanceResponse preserved = service.getById(historical.id());
+        assertEquals("STU-6005", preserved.studentCode());
+        assertEquals("History Test", preserved.studentName());
+
+        var byStudent = service.getAttendance(
+                null, null, null, historyStudent.getId(), 0, 20
+        );
+        assertEquals(1, byStudent.content().size());
+
+        AttendanceSummaryResponse summary = service.getSummary(historyDate);
+        assertEquals(1, summary.total());
+        assertEquals(1, summary.present());
+    }
+
+    @Test
     void validatesRequiredAttendanceFields() {
         var violations = validator.validate(
                 new AttendanceRequest(null, null, " ", "x".repeat(256))

@@ -1,5 +1,6 @@
 package com.campushub.backend.student;
 
+import com.campushub.backend.common.DuplicateFieldException;
 import jakarta.validation.Validator;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -271,7 +272,10 @@ class StudentServiceTests {
         assertEquals(created.id(), service.getById(created.id()).id());
 
         service.delete(created.id());
-        assertTrue(repository.findById(created.id()).isEmpty());
+        assertTrue(repository.findById(created.id()).isPresent());
+        assertNotNull(repository.findById(created.id()).orElseThrow().getDeletedAt());
+        assertTrue(repository.findByIdAndDeletedAtIsNull(created.id()).isEmpty());
+        assertTrue(service.getStudents(null, null, null, 0, 20, null, null).content().isEmpty());
     }
 
     @Test
@@ -301,6 +305,25 @@ class StudentServiceTests {
                 )
         );
         assertEquals(HttpStatus.CONFLICT, duplicateStudentId.getStatusCode());
+        assertEquals(
+                "Student ID already exists",
+                ((DuplicateFieldException) duplicateStudentId).getErrors().get("studentId")
+        );
+
+        ResponseStatusException duplicateStudentIdCaseVariant = assertThrows(
+                ResponseStatusException.class,
+                () -> createStudent(
+                        "stu-1401",
+                        "Case Variant Student",
+                        "case1401@example.com",
+                        null,
+                        "Computer Science",
+                        "BSc Computer Science",
+                        LocalDate.of(2024, 9, 1),
+                        "ACTIVE"
+                )
+        );
+        assertEquals(HttpStatus.CONFLICT, duplicateStudentIdCaseVariant.getStatusCode());
 
         ResponseStatusException duplicateEmail = assertThrows(
                 ResponseStatusException.class,
@@ -316,6 +339,10 @@ class StudentServiceTests {
                 )
         );
         assertEquals(HttpStatus.CONFLICT, duplicateEmail.getStatusCode());
+        assertEquals(
+                "Email already exists",
+                ((DuplicateFieldException) duplicateEmail).getErrors().get("email")
+        );
 
         ResponseStatusException missingUpdate = assertThrows(
                 ResponseStatusException.class,
@@ -344,6 +371,80 @@ class StudentServiceTests {
         ResponseStatusException missingLookup = assertThrows(
                 ResponseStatusException.class,
                 () -> service.getById(999999L)
+        );
+        assertEquals(HttpStatus.NOT_FOUND, missingLookup.getStatusCode());
+    }
+
+    @Test
+    void softDeletionHidesLiveDirectoryButPreservesIdentityAndBlocksReuse() {
+        StudentResponse created = createStudent(
+                "STU-1501",
+                "Soft Deleted Student",
+                "soft1501@example.com",
+                null,
+                "Computer Science",
+                "BSc Computer Science",
+                LocalDate.of(2024, 9, 1),
+                "ACTIVE"
+        );
+
+        service.delete(created.id());
+
+        assertTrue(service.getStudents(null, null, null, 0, 20, null, null)
+                .content().isEmpty());
+
+        var history = service.getStudents(
+                null, null, null, 0, 20, null, null, true
+        );
+        assertEquals(1, history.content().size());
+        assertEquals("STU-1501", history.content().get(0).studentId());
+
+        Student stored = repository.findById(created.id()).orElseThrow();
+        assertNotNull(stored.getDeletedAt());
+        assertEquals("STU-1501", stored.getStudentId());
+        assertEquals("soft1501@example.com", stored.getEmail());
+
+        StudentSummaryResponse summary = service.getSummary();
+        assertEquals(0, summary.totalStudents());
+        assertEquals(0, summary.activeStudents());
+        assertEquals(0, summary.inactiveStudents());
+        assertEquals(0, summary.departmentCount());
+
+        DuplicateFieldException idReuse = assertThrows(
+                DuplicateFieldException.class,
+                () -> createStudent(
+                        "stu-1501",
+                        "Reused ID Student",
+                        "reuse1501@example.com",
+                        null,
+                        "Computer Science",
+                        "BSc Computer Science",
+                        LocalDate.of(2024, 9, 1),
+                        "ACTIVE"
+                )
+        );
+        assertEquals(HttpStatus.CONFLICT, idReuse.getStatusCode());
+        assertTrue(idReuse.getErrors().containsKey("studentId"));
+
+        DuplicateFieldException emailReuse = assertThrows(
+                DuplicateFieldException.class,
+                () -> createStudent(
+                        "STU-1502",
+                        "Reused Email Student",
+                        "SOFT1501@example.com",
+                        null,
+                        "Computer Science",
+                        "BSc Computer Science",
+                        LocalDate.of(2024, 9, 1),
+                        "ACTIVE"
+                )
+        );
+        assertEquals(HttpStatus.CONFLICT, emailReuse.getStatusCode());
+        assertTrue(emailReuse.getErrors().containsKey("email"));
+
+        ResponseStatusException missingLookup = assertThrows(
+                ResponseStatusException.class,
+                () -> service.getById(created.id())
         );
         assertEquals(HttpStatus.NOT_FOUND, missingLookup.getStatusCode());
     }

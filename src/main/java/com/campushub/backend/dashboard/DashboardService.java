@@ -33,7 +33,7 @@ public class DashboardService {
 
     @Transactional(readOnly = true)
     public DashboardStatisticsResponse getStatistics() {
-        long total = studentRepository.count();
+        long total = studentRepository.countLiveStudents();
         long active =
                 studentRepository.countByStatusIgnoreCase("ACTIVE");
         long inactive =

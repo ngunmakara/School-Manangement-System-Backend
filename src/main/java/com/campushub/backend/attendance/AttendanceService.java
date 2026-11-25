@@ -111,7 +111,7 @@ public class AttendanceService {
     }
 
     public AttendanceResponse create(AttendanceRequest request) {
-        Student student = findStudent(request.studentId());
+        Student student = findStudentForNewAttendance(request.studentId());
         String status = validateStatus(request.status());
 
         if (repository.existsByStudent_IdAndAttendanceDate(
@@ -164,6 +164,26 @@ public class AttendanceService {
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Student not found"
                 ));
+    }
+
+    private Student findStudentForNewAttendance(Long studentId) {
+        Student student = findStudent(studentId);
+
+        if (student.isDeleted()) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Attendance cannot be created for a soft-deleted student"
+            );
+        }
+
+        if ("INACTIVE".equalsIgnoreCase(student.getStatus())) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Attendance cannot be created for an inactive student"
+            );
+        }
+
+        return student;
     }
 
     private void validatePagination(int page, int size) {

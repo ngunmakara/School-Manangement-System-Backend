@@ -43,6 +43,9 @@ public class Student {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    @Column(name = "deleted_at")
+    private LocalDateTime deletedAt;
+
     @PrePersist
     public void onCreate() {
         LocalDateTime now = LocalDateTime.now();
@@ -70,6 +73,13 @@ public class Student {
     public String getStatus() { return status; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public LocalDateTime getUpdatedAt() { return updatedAt; }
+    public LocalDateTime getDeletedAt() { return deletedAt; }
+
+    public boolean isDeleted() { return deletedAt != null; }
+
+    public void markDeleted() { this.deletedAt = LocalDateTime.now(); }
+
+    public void restore() { this.deletedAt = null; }
 
     public void setStudentId(String studentId) { this.studentId = studentId; }
     public void setFullName(String fullName) { this.fullName = fullName; }
@@ -81,4 +91,5 @@ public class Student {
         this.enrollmentDate = enrollmentDate;
     }
     public void setStatus(String status) { this.status = status; }
+    public void setDeletedAt(LocalDateTime deletedAt) { this.deletedAt = deletedAt; }
 }

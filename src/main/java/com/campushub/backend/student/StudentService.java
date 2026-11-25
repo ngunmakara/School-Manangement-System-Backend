@@ -1,6 +1,7 @@
 
 package com.campushub.backend.student;
 
+import com.campushub.backend.common.DuplicateFieldException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -47,6 +48,22 @@ public class StudentService {
             String sortBy,
             String sortDir) {
 
+        return getStudents(
+                search, status, department, page, size, sortBy, sortDir, false
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public PageResponse<StudentResponse> getStudents(
+            String search,
+            String status,
+            String department,
+            int page,
+            int size,
+            String sortBy,
+            String sortDir,
+            boolean includeDeleted) {
+
         validatePagination(page, size);
 
         String cleanSearch =
@@ -80,10 +97,11 @@ public class StudentService {
         Pageable pageable = PageRequest.of(page, size, sort);
 
         Page<StudentResponse> result = repository
-                .searchStudents(
+                .searchStudentsForHistory(
                         cleanSearch,
                         cleanStatus,
                         cleanDepartment,
+                        includeDeleted,
                         pageable
                 )
                 .map(StudentResponse::from);
@@ -93,7 +111,7 @@ public class StudentService {
 
     @Transactional(readOnly = true)
     public StudentSummaryResponse getSummary() {
-        long totalStudents = repository.count();
+        long totalStudents = repository.countLiveStudents();
         long activeStudents =
                 repository.countByStatusIgnoreCase("ACTIVE");
         long inactiveStudents =
@@ -136,12 +154,12 @@ public class StudentService {
 
     public void delete(Long id) {
         Student student = findStudent(id);
-        repository.delete(student);
-        repository.flush();
+        student.markDeleted();
+        repository.saveAndFlush(student);
     }
 
     private Student findStudent(Long id) {
-        return repository.findById(id)
+        return repository.findByIdAndDeletedAtIsNull(id)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Student not found"
                 ));
@@ -205,7 +223,7 @@ public class StudentService {
 
     private void validateUnique(StudentRequest request, Long currentId) {
         boolean duplicateStudentId =
-                repository.existsByStudentId(request.studentId().trim());
+                repository.existsByStudentIdIgnoreCase(request.studentId().trim());
 
         boolean duplicateEmail =
                 repository.existsByEmailIgnoreCase(request.email().trim());
@@ -225,14 +243,14 @@ public class StudentService {
         }
 
         if (duplicateStudentId) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT, "Student ID already exists"
+            throw new DuplicateFieldException(
+                    "studentId", "Student ID already exists"
             );
         }
 
         if (duplicateEmail) {
-            throw new ResponseStatusException(
-                    HttpStatus.CONFLICT, "Email already exists"
+            throw new DuplicateFieldException(
+                    "email", "Email already exists"
             );
         }
     }

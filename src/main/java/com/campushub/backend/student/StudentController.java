@@ -23,7 +23,8 @@ public class StudentController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @RequestParam(required = false) String sortBy,
-            @RequestParam(required = false) String sortDir) {
+            @RequestParam(required = false) String sortDir,
+            @RequestParam(defaultValue = "false") boolean includeDeleted) {
 
         return service.getStudents(
                 search,
@@ -32,7 +33,8 @@ public class StudentController {
                 page,
                 size,
                 sortBy,
-                sortDir
+                sortDir,
+                includeDeleted
         );
     }
 

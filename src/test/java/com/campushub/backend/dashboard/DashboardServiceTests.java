@@ -45,7 +45,30 @@ class DashboardServiceTests {
         assertEquals(1, trend.previousTotal());
     }
 
-    private void createStudent(
+    @Test
+    void excludesSoftDeletedStudentsFromLiveDashboardAggregates() {
+        LocalDate today = LocalDate.now();
+
+        createStudent("STU-7101", "Live Student", "live7101@example.com", today);
+        Student deleted = createStudent(
+                "STU-7102", "Deleted Student", "deleted7102@example.com", today
+        );
+        deleted.markDeleted();
+        studentRepository.saveAndFlush(deleted);
+
+        DashboardStatisticsResponse statistics = service.getStatistics();
+        assertEquals(1, statistics.totalStudents());
+        assertEquals(1, statistics.activeStudents());
+        assertEquals(0, statistics.inactiveStudents());
+        assertEquals(1, statistics.studentsByDepartment().size());
+        assertEquals(1, statistics.studentsByDepartment().get(0).count());
+
+        EnrollmentTrendResponse trend = service.getEnrollmentTrend();
+        assertEquals(1, trend.currentTotal());
+        assertEquals(0, trend.previousTotal());
+    }
+
+    private Student createStudent(
             String code, String name, String email, LocalDate enrollmentDate) {
 
         Student student = new Student();
@@ -56,6 +79,6 @@ class DashboardServiceTests {
         student.setProgram("BSc Computer Science");
         student.setEnrollmentDate(enrollmentDate);
         student.setStatus("ACTIVE");
-        studentRepository.saveAndFlush(student);
+        return studentRepository.saveAndFlush(student);
     }
 }
