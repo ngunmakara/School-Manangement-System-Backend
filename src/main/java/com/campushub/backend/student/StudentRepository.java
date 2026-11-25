@@ -30,10 +30,12 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
             OR LOWER(s.phone) LIKE LOWER(CONCAT('%', :search, '%'))
         )
         AND (:status IS NULL OR s.status = :status)
+        AND (:department IS NULL OR LOWER(s.department) = LOWER(:department))
         """)
     Page<Student> searchStudents(
             @Param("search") String search,
             @Param("status") String status,
+            @Param("department") String department,
             Pageable pageable
     );
 

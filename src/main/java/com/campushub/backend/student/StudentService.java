@@ -11,10 +11,25 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Locale;
+import java.util.Map;
 
 @Service
 @Transactional
 public class StudentService {
+
+    private static final String DEFAULT_SORT_BY = "createdAt";
+    private static final String DEFAULT_SORT_DIR = "desc";
+
+    private static final Map<String, String> SORT_FIELDS = Map.ofEntries(
+            Map.entry("studentid", "studentId"),
+            Map.entry("fullname", "fullName"),
+            Map.entry("email", "email"),
+            Map.entry("department", "department"),
+            Map.entry("program", "program"),
+            Map.entry("enrollmentdate", "enrollmentDate"),
+            Map.entry("status", "status"),
+            Map.entry("createdat", "createdAt")
+    );
 
     private final StudentRepository repository;
 
@@ -24,14 +39,15 @@ public class StudentService {
 
     @Transactional(readOnly = true)
     public PageResponse<StudentResponse> getStudents(
-            String search, String status, int page, int size) {
+            String search,
+            String status,
+            String department,
+            int page,
+            int size,
+            String sortBy,
+            String sortDir) {
 
-        if (page < 0 || size < 1 || size > 100) {
-            throw new ResponseStatusException(
-                    HttpStatus.BAD_REQUEST,
-                    "Page must be >= 0 and size must be between 1 and 100"
-            );
-        }
+        validatePagination(page, size);
 
         String cleanSearch =
                 search == null || search.isBlank() ? null : search.trim();
@@ -49,19 +65,48 @@ public class StudentService {
             );
         }
 
-        Pageable pageable = PageRequest.of(
-                page, size,
-                Sort.by(
-                        Sort.Order.desc("createdAt"),
-                        Sort.Order.desc("id")
-                )
+        String cleanDepartment =
+                department == null || department.isBlank()
+                        ? null : department.trim();
+
+        String sortField = resolveSortField(sortBy);
+        Sort.Direction direction = resolveSortDirection(sortDir);
+
+        Sort sort = Sort.by(
+                new Sort.Order(direction, sortField),
+                new Sort.Order(direction, "id")
         );
 
+        Pageable pageable = PageRequest.of(page, size, sort);
+
         Page<StudentResponse> result = repository
-                .searchStudents(cleanSearch, cleanStatus, pageable)
+                .searchStudents(
+                        cleanSearch,
+                        cleanStatus,
+                        cleanDepartment,
+                        pageable
+                )
                 .map(StudentResponse::from);
 
         return PageResponse.from(result);
+    }
+
+    @Transactional(readOnly = true)
+    public StudentSummaryResponse getSummary() {
+        long totalStudents = repository.count();
+        long activeStudents =
+                repository.countByStatusIgnoreCase("ACTIVE");
+        long inactiveStudents =
+                repository.countByStatusIgnoreCase("INACTIVE");
+        long departmentCount =
+                repository.countStudentsByDepartment().size();
+
+        return new StudentSummaryResponse(
+                totalStudents,
+                activeStudents,
+                inactiveStudents,
+                departmentCount
+        );
     }
 
     @Transactional(readOnly = true)
@@ -100,6 +145,51 @@ public class StudentService {
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Student not found"
                 ));
+    }
+
+    private void validatePagination(int page, int size) {
+        if (page < 0 || size < 1 || size > 100) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Page must be >= 0 and size must be between 1 and 100"
+            );
+        }
+    }
+
+    private String resolveSortField(String sortBy) {
+        if (sortBy == null || sortBy.isBlank()) {
+            return DEFAULT_SORT_BY;
+        }
+
+        String field = SORT_FIELDS.get(
+                sortBy.trim().toLowerCase(Locale.ROOT)
+        );
+
+        if (field == null) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Unsupported sort field: " + sortBy.trim()
+            );
+        }
+
+        return field;
+    }
+
+    private Sort.Direction resolveSortDirection(String sortDir) {
+        if (sortDir == null || sortDir.isBlank()) {
+            return Sort.Direction.fromString(DEFAULT_SORT_DIR);
+        }
+
+        String direction = sortDir.trim().toLowerCase(Locale.ROOT);
+
+        if (!direction.equals("asc") && !direction.equals("desc")) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Sort direction must be asc or desc"
+            );
+        }
+
+        return Sort.Direction.fromString(direction);
     }
 
     private void validateStatus(String status) {

@@ -19,10 +19,26 @@ public class StudentController {
     public PageResponse<StudentResponse> getAll(
             @RequestParam(defaultValue = "") String search,
             @RequestParam(required = false) String status,
+            @RequestParam(required = false) String department,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String sortBy,
+            @RequestParam(required = false) String sortDir) {
 
-        return service.getStudents(search, status, page, size);
+        return service.getStudents(
+                search,
+                status,
+                department,
+                page,
+                size,
+                sortBy,
+                sortDir
+        );
+    }
+
+    @GetMapping("/summary")
+    public StudentSummaryResponse getSummary() {
+        return service.getSummary();
     }
 
     @GetMapping("/{id}")
