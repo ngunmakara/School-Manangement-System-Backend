@@ -27,6 +27,7 @@ public interface StudentRepository extends JpaRepository<Student, Long> {
             OR LOWER(s.studentId) LIKE LOWER(CONCAT('%', :search, '%'))
             OR LOWER(s.fullName) LIKE LOWER(CONCAT('%', :search, '%'))
             OR LOWER(s.email) LIKE LOWER(CONCAT('%', :search, '%'))
+            OR LOWER(s.phone) LIKE LOWER(CONCAT('%', :search, '%'))
         )
         AND (:status IS NULL OR s.status = :status)
         """)
